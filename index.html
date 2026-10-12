@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selma — a slow work journal</title>
+  <meta name="description" content="A quiet place to open the day's work, note what it was, and close the book.">
+  <meta name="theme-color" content="#F6F3EE">
+  <link rel="icon" href="selma-work.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-title" content="Slow work">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="home-link" href="../selma/">← All Selma journals</a>
+    <div class="brand">
+      <img class="selma" src="selma-work.svg" width="56" height="56" alt="Selma the Snail, with a book for a shell">
+      <div>
+        <h1>Selma</h1>
+        <p>a slow work journal</p>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab" data-view="today" aria-current="page">Today</button>
+      <button class="tab" data-view="notebook">Notebook</button>
+      <button class="tab" data-view="trail">Trail</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Today -->
+    <section id="view-today">
+      <div class="hello">
+        <h2 id="greeting"></h2>
+        <p class="date" id="today-date"></p>
+        <p id="greeting-sub"></p>
+      </div>
+      <div id="today"></div>
+    </section>
+
+    <!-- Notebook -->
+    <section id="view-notebook" hidden>
+      <fieldset class="segmented" id="notebook-filter">
+        <legend>Leaf through</legend>
+      </fieldset>
+      <div id="notebook"></div>
+    </section>
+
+    <!-- Trail -->
+    <section id="view-trail" hidden>
+      <div id="trail"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Nothing here is counted or totalled. Everything stays in this browser. <span id="backup-status"></span></p>
+    <a class="link" href="../selma-time/">Slow time journal</a>
+    <a class="link" href="../selma-mail/">Mail journal</a>
+    <div class="backup">
+      <button class="btn quiet" data-action="export">Save a backup</button>
+      <button class="btn quiet" data-action="import">Restore from backup</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+    </div>
+  </footer>
+
+  <!-- A sitting -->
+  <dialog id="sitting-dialog">
+    <form id="sitting-form">
+      <h2 id="sitting-heading">Note a sitting</h2>
+      <p class="for-day" id="sitting-day"></p>
+      <input type="hidden" name="id">
+      <input type="hidden" name="day">
+      <fieldset class="segmented" id="sitting-modes">
+        <legend>What kind of work was it? <span class="optional">as many as apply</span></legend>
+      </fieldset>
+      <fieldset class="segmented">
+        <legend>Where does it belong?</legend>
+        <label><input type="radio" name="thread" value="dissertation" checked><span>Dissertation</span></label>
+        <label><input type="radio" name="thread" value="none"><span>No home yet</span></label>
+        <label><input type="radio" name="thread" value="other"><span>Something else</span></label>
+      </fieldset>
+      <label id="thread-name-label" hidden>What is it?
+        <input name="threadName" autocomplete="off" maxlength="40" list="thread-names" placeholder="e.g. peer review, teaching">
+        <datalist id="thread-names"></datalist>
+      </label>
+      <label>What was it? <span class="optional">optional</span>
+        <input name="note" autocomplete="off" maxlength="160" placeholder="e.g., Selma Sevenhuijsen, Citizenship and the Ethics of Care">
+      </label>
+      <fieldset class="segmented" id="sitting-places">
+        <legend>Where are the notes? <span class="optional">optional, as many as apply</span></legend>
+      </fieldset>
+      <label id="paper-label" hidden>Where else?
+        <input name="paper" autocomplete="off" maxlength="80">
+      </label>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn quiet" data-action="close-dialog">Cancel</button>
+        <button type="submit" class="btn primary" id="sitting-submit">Note it</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- An insight (quick) or a memo (longer) -->
+  <dialog id="note-dialog">
+    <form id="note-form">
+      <h2 id="note-heading"></h2>
+      <p class="for-day" id="note-day"></p>
+      <input type="hidden" name="id">
+      <input type="hidden" name="day">
+      <input type="hidden" name="kind">
+      <label id="note-title-label">A title <span class="optional">optional</span>
+        <input name="title" autocomplete="off" maxlength="120">
+      </label>
+      <fieldset class="segmented" id="note-tags">
+        <legend>What kind of memo? <span class="optional">optional</span></legend>
+      </fieldset>
+      <label><span id="note-text-label"></span>
+        <textarea name="text" rows="5" required></textarea>
+      </label>
+      <label>Where did it come from? <span class="optional">optional</span>
+        <input name="source" autocomplete="off" maxlength="160" placeholder="a page, a conversation, a walk">
+      </label>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn quiet" data-action="close-dialog">Cancel</button>
+        <button type="submit" class="btn primary">Keep it</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Always within reach: before the book is opened, after it is closed, on any tab. -->
+  <button class="btn primary catch" data-action="catch-insight">Catch an insight</button>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
