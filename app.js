@@ -275,8 +275,9 @@ function renderNotebook() {
 
 /* ---------- Trail ---------- */
 
-// One mark per day: filled with the colours of the day's work when the dissertation was touched,
-// a ring when the work was all for something else, a crescent for a planned rest, a small dot otherwise.
+// One mark per day, in the colours of all the day's work: a full circle when the dissertation
+// was touched, a ring when the work was all for something else, a crescent for a planned rest,
+// a small dot otherwise.
 function markHTML(key, todayKey) {
   const sittings = state.sittings.filter((s) => s.day === key);
   const touched = sittings.filter(touches);
@@ -284,17 +285,14 @@ function markHTML(key, todayKey) {
   if (key > todayKey) {
     cls = isRest(key) ? 'planned' : 'ahead';
     what = isRest(key) ? 'a planned rest' : 'still ahead';
-  } else if (touched.length) {
-    const modes = MODES.filter((m) => touched.some((s) => s.modes.includes(m.id)));
+  } else if (sittings.length) {
+    const modes = MODES.filter((m) => sittings.some((s) => s.modes.includes(m.id)));
     const step = 100 / modes.length;
     fill = modes.length > 1
       ? `conic-gradient(${modes.map((m, i) => `var(--${m.id}) ${i * step}% ${(i + 1) * step}%`).join(', ')})`
       : `var(--${modes[0].id})`;
-    cls = 'touched';
-    what = modes.map((m) => m.name.toLowerCase()).join(', ');
-  } else if (sittings.length) {
-    cls = 'other';
-    what = 'other work';
+    cls = touched.length ? 'touched' : 'other';
+    what = modes.map((m) => m.name.toLowerCase()).join(', ') + (touched.length ? '; the dissertation was touched' : '; other work');
   } else if (isRest(key)) {
     cls = 'planned';
     what = 'a planned rest';
@@ -333,7 +331,7 @@ function renderTrail() {
       ${marks}
     </div>
     <div class="legend">${modeDots(MODES.map((m) => m.id))}</div>
-    <p class="trail-key">A filled mark is a day the dissertation was touched, in the colours of the work. A ring is a day of other work. A crescent is a planned rest. Choose a day to read it, add to it, or set it aside for rest.</p>
+    <p class="trail-key">Each mark holds the colours of all the day's work. A full circle is a day the dissertation was touched; a ring is a day of other work only. A crescent is a planned rest, and the small dot underneath marks today. Choose a day to read it, add to it, or set it aside for rest.</p>
     ${opened}`;
 }
 

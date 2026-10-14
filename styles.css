@@ -343,7 +343,8 @@ dialog.wide { width: min(680px, calc(100vw - 24px)); }
 }
 .mark i { display: block; border-radius: 50%; }
 .mark.touched i { width: 26px; height: 26px; }
-.mark.other i { width: 22px; height: 22px; border: 2px solid var(--sage); }
+/* Other work only: the same colours, as a ring with the middle cut out. */
+.mark.other i { width: 26px; height: 26px; -webkit-mask: radial-gradient(circle, transparent 7px, #000 7.5px); mask: radial-gradient(circle, transparent 7px, #000 7.5px); }
 .mark.rest i { width: 6px; height: 6px; background: var(--line); }
 .mark.ahead i { width: 6px; height: 6px; border: 1px solid var(--line); }
 /* A planned rest is a small crescent. */
@@ -353,7 +354,9 @@ dialog.wide { width: min(680px, calc(100vw - 24px)); }
 .for-day:empty { display: none; }
 footer .backup { flex-basis: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
 footer .backup .btn { font-size: 14px; padding: 7px 14px; }
-.mark.today { box-shadow: 0 0 0 1.5px var(--ink); }
+/* Today is marked by a small dot underneath, so it is never mistaken for a ring. */
+.mark { position: relative; }
+.mark.today::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--ink); }
 .mark[aria-pressed="true"] { background: var(--sage-soft); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 22px 0 6px; font-size: 14px; color: var(--muted); }
 .trail-key { color: var(--muted); font-size: 14px; margin: 0 0 28px; max-width: 56ch; }
