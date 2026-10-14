@@ -221,6 +221,7 @@ footer { padding-bottom: 84px; }
   --literature: #A9BDCA;
   --fieldwork: #D9BC6A;
   --analysis: #A892B0;
+  --clauding: #DDA0A0;
 }
 .dot::before {
   content: "";

@@ -20,6 +20,7 @@ const MODES = [
   { id: 'literature', name: 'Desk research' }, // finding and gathering sources, as distinct from reading them
   { id: 'fieldwork', name: 'Fieldwork' },
   { id: 'analysis', name: 'Analysis' },
+  { id: 'clauding', name: 'Clauding' }, // brainstorming and building with Claude
 ];
 
 const state = loadState();
@@ -82,7 +83,7 @@ function leftOff() {
 const isRest = (key) => !!state.days[key]?.rest && !state.sittings.some((s) => s.day === key);
 
 // A day has "touched the dissertation" when any sitting was for it, or had no home yet.
-const touches = (s) => s.thread !== 'other';
+const touches = (s) => s.thread === 'dissertation' || s.thread === 'none';
 
 /* ---------- Entries ---------- */
 
@@ -95,6 +96,7 @@ function modeDots(ids) {
 
 function threadLabel(s) {
   if (s.thread === 'none') return 'no home yet';
+  if (s.thread === 'tud') return 'TUD';
   if (s.thread === 'other') return s.threadName || 'something else';
   return 'dissertation';
 }
