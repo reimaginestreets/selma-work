@@ -22,7 +22,16 @@
 
 * { box-sizing: border-box; }
 
+/* After 21:00 the page dims to a warmer dusk, a quiet cue to stop. */
+:root.evening {
+  --bg: #EAE2D6;
+  --surface: #F4EDE3;
+  --line: #DCD2C3;
+  --sage-soft: #DFE5DB;
+}
+
 body {
+  transition: background-color 1.5s ease;
   margin: 0;
   background: var(--bg);
   color: var(--ink);
@@ -222,6 +231,7 @@ footer { padding-bottom: 84px; }
   --fieldwork: #D9BC6A;
   --analysis: #A892B0;
   --clauding: #DDA0A0;
+  --freewriting: #7FAFA8;
 }
 .dot::before {
   content: "";
@@ -258,6 +268,8 @@ textarea::placeholder { color: #869094; }
 .card .aside { margin: 12px 0 0; color: var(--muted); font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 
+.nudge.quiet { background: var(--sage-soft); color: var(--sage-text); }
+.nudge .link { margin-left: 10px; font-size: 15px; }
 .nudge {
   background: var(--clay-soft);
   color: var(--clay-deep);
@@ -298,6 +310,9 @@ dialog.wide { width: min(680px, calc(100vw - 24px)); }
 .card form.stack textarea { display: block; width: 100%; margin-top: 6px; font: inherit; font-weight: 400; color: inherit; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: vertical; }
 .card form.stack .btn { justify-self: start; }
 .closed .said { white-space: pre-line; }
+/* The label in small sans capitals, the words themselves in italic serif. */
+.closed .said b { font: 500 12px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 6px; vertical-align: 2px; }
+.closed .said em { font-style: italic; }
 .entry.insight p { font: 400 18px/1.5 var(--serif); margin: 0; white-space: pre-wrap; }
 .entry .kind { font: 500 12px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
 .card .left-off { margin: 0 0 14px; color: var(--muted); }
@@ -306,6 +321,7 @@ dialog.wide { width: min(680px, calc(100vw - 24px)); }
 
 /* Notebook */
 #notebook-filter { margin-bottom: 28px; }
+#notebook-filter .segmented + .segmented { margin-top: 16px; }
 /* Each day is a sheet of ruled paper with a margin line. Everything on it sits on a 32px rule. */
 .day {
   --rule: 32px;

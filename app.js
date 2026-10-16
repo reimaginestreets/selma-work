@@ -17,6 +17,7 @@ const MEMO_TAGS = ['Analytic', 'Theoretical', 'Methodological', 'Reflexive', 'De
 const MODES = [
   { id: 'reading', name: 'Reading' },
   { id: 'writing', name: 'Writing' },
+  { id: 'freewriting', name: 'Freewriting' }, // thinking on paper: journaling, brainstorming, jotting
   { id: 'literature', name: 'Desk research' }, // finding and gathering sources, as distinct from reading them
   { id: 'fieldwork', name: 'Fieldwork' },
   { id: 'analysis', name: 'Analysis' },
@@ -24,7 +25,9 @@ const MODES = [
 ];
 
 const state = loadState();
-let notebookFilter = ''; // '', 'insights' or a mode id
+// What the notebook is showing: kind is '', 'insights', 'memos' or a mode id; home is a sitting's
+// home; tag is a kind of memo.
+const notebookFilter = { kind: '', home: '', tag: '' };
 let trailDay = null;     // the day opened on the trail
 let editingIntention = false;
 
@@ -68,6 +71,9 @@ function keyDate(key) {
 }
 const longDate = (key) => keyDate(key).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 const nowHHMM = () => new Date().toTimeString().slice(0, 5);
+// Late runs from the nudge until early morning, so work past midnight still counts as late.
+const isLate = () => nowHHMM() >= NUDGE_AT || nowHHMM() < '05:00';
+const daysBetween = (a, b) => Math.round((keyDate(b) - keyDate(a)) / 864e5);
 const today = () => (state.days[dayKey()] ||= {});
 
 // When an entry was made. Ids begin with the time, so the earliest entries without `at` still sort.
@@ -134,10 +140,13 @@ function insightHTML(i) {
   </li>`;
 }
 
-function entriesHTML(key, filter = '') {
-  const notesOnly = filter === 'insights' || filter === 'memos';
-  const sittings = notesOnly ? [] : state.sittings.filter((s) => s.day === key && (!filter || s.modes.includes(filter)));
-  const insights = filter && !notesOnly ? [] : state.insights.filter((i) => i.day === key && (!filter || (i.kind === 'memo') === (filter === 'memos')));
+function entriesHTML(key, { kind = '', home = '', tag = '' } = {}) {
+  const notesOnly = kind === 'insights' || kind === 'memos';
+  const sittings = notesOnly ? [] : state.sittings.filter((s) => s.day === key
+    && (!kind || s.modes.includes(kind)) && (!home || s.thread === home));
+  // Insights and memos have no home, so a home filter shows sittings only.
+  const insights = (kind && !notesOnly) || home ? [] : state.insights.filter((i) => i.day === key
+    && (!kind || (i.kind === 'memo') === (kind === 'memos')) && (!tag || i.tag === tag));
   if (!sittings.length && !insights.length) return '';
   // Sittings and insights sit together in the order they happened.
   const all = [...sittings.map((s) => [s, sittingHTML]), ...insights.map((i) => [i, insightHTML])];
@@ -165,8 +174,8 @@ function renderToday() {
     $('#today').innerHTML = `<div class="closed">
       <img src="selma-work.svg" alt="" width="96" height="96">
       <h3>The book is closed.</h3>
-      ${day.closing ? `<p class="said">Next: ${esc(day.closing)}</p>` : ''}
-      ${day.evening ? `<p class="said">This evening: ${esc(day.evening)}</p>` : ''}
+      ${day.closing ? `<p class="said"><b>Next</b> <em>${esc(day.closing)}</em></p>` : ''}
+      ${day.evening ? `<p class="said"><b>This evening</b> <em>${esc(day.evening)}</em></p>` : ''}
       <p>Work will keep until tomorrow. Selma has other journals for the evening.</p>
       <div class="actions">
         <a class="link" href="../selma-time/">Slow time journal</a>
@@ -191,11 +200,13 @@ function renderToday() {
     return;
   }
 
-  const late = nowHHMM() >= NUDGE_AT;
+  const late = isLate();
   const entries = entriesHTML(key);
   const pickUp = leftOff();
 
   $('#today').innerHTML = `
+    ${backupDue() ? `<p class="nudge quiet">${localStorage.getItem(BACKUP_KEY) ? 'It has been a while since the last backup.' : 'This journal has not been backed up yet.'}
+      <button class="link" data-action="export">Save a backup</button><button class="link" data-action="backup-later">Later</button></p>` : ''}
     ${late ? `<p class="nudge">It is past ${NUDGE_AT}. The rest can wait until tomorrow.</p>` : ''}
 
     <div class="card">
@@ -241,17 +252,27 @@ function renderToday() {
 
 /* ---------- Notebook ---------- */
 
-function renderFilter() {
-  const options = [['', 'Everything'], ['insights', 'Insights'], ['memos', 'Memos'], ...MODES.map((m) => [m.id, m.name])];
-  $('#notebook-filter').innerHTML = '<legend>Leaf through</legend>' + options.map(([value, name]) => {
+function chips(name, legend, options, current) {
+  return `<fieldset class="segmented"><legend>${legend}</legend>${options.map(([value, label]) => {
     const dot = MODES.some((m) => m.id === value) ? ` class="dot" style="--c: var(--${value})"` : '';
-    return `<label><input type="radio" name="filter" value="${value}"${value === notebookFilter ? ' checked' : ''}><span${dot}>${name}</span></label>`;
-  }).join('');
+    return `<label><input type="radio" name="${name}" value="${value}"${value === current ? ' checked' : ''}><span${dot}>${label}</span></label>`;
+  }).join('')}</fieldset>`;
 }
 
-function dayHTML(key, filter = '') {
+function renderFilter() {
+  const { kind, home, tag } = notebookFilter;
+  const kinds = [['', 'Everything'], ['insights', 'Insights'], ['memos', 'Memos'], ...MODES.map((m) => [m.id, m.name])];
+  const homes = [['', 'Anywhere'], ['dissertation', 'Dissertation'], ['none', 'No home yet'], ['tud', 'TUD'], ['other', 'Something else']];
+  const tags = [['', 'Any kind'], ...MEMO_TAGS.map((t) => [t, t])];
+  $('#notebook-filter').innerHTML = chips('filter', 'Leaf through', kinds, kind)
+    + (kind === 'insights' || kind === 'memos' ? '' : chips('home', 'Belonging to', homes, home))
+    + (kind === 'memos' ? chips('tag', 'Kind of memo', tags, tag) : '');
+}
+
+function dayHTML(key, filter = {}) {
   const day = state.days[key] || {};
   const entries = entriesHTML(key, filter);
+  filter = filter.kind || filter.home; // the bookends only show when nothing is filtered
   const bookends = !filter && (day.intention || day.closing);
   if (!entries && !bookends) return '';
   return `<article class="day">
@@ -433,6 +454,12 @@ document.addEventListener('click', (event) => {
     RENDER[view]();
   } else if (action === 'export') exportBackup();
   else if (action === 'import') $('#import-file').click();
+  else if (action === 'backup-later') {
+    const later = new Date();
+    later.setDate(later.getDate() + 3);
+    localStorage.setItem(BACKUP_KEY + '-later', dayKey(later));
+    renderToday();
+  }
   else if (action === 'edit-sitting') openSittingDialog(state.sittings.find((x) => x.id === id));
   else if (action === 'edit-note') {
     const note = state.insights.find((x) => x.id === id);
@@ -531,8 +558,12 @@ document.addEventListener('input', (event) => {
 
 document.addEventListener('change', (event) => {
   const el = event.target;
-  if (el.name === 'filter') {
-    notebookFilter = el.value;
+  if (el.name === 'filter' || el.name === 'home' || el.name === 'tag') {
+    notebookFilter[el.name === 'filter' ? 'kind' : el.name] = el.value;
+    if (el.name === 'filter') {
+      if (el.value === 'insights' || el.value === 'memos') notebookFilter.home = '';
+      if (el.value !== 'memos') notebookFilter.tag = '';
+    }
     renderNotebook();
   } else if (el.name === 'thread') {
     $('#thread-name-label').hidden = el.value !== 'other';
@@ -557,6 +588,18 @@ function exportBackup() {
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   localStorage.setItem(BACKUP_KEY, dayKey());
   renderBackup();
+  RENDER[view]();
+}
+
+// A gentle reminder on Today: a week after the first entry if there has never been a backup,
+// or two weeks after the last one. "Later" puts it off for three days.
+function backupDue() {
+  const days = [...state.sittings, ...state.insights].map((e) => e.day).sort();
+  if (!days.length) return false;
+  const later = localStorage.getItem(BACKUP_KEY + '-later');
+  if (later && later > dayKey()) return false;
+  const last = localStorage.getItem(BACKUP_KEY);
+  return last ? daysBetween(last, dayKey()) >= 14 : daysBetween(days[0], dayKey()) >= 7;
 }
 
 // Restoring replaces everything on this device with what the backup holds.
@@ -582,6 +625,18 @@ $('#import-file').addEventListener('change', async (event) => {
 
 renderBackup();
 show('today');
+
+// The evening tone follows the clock. Today is redrawn when it turns, unless something is being typed.
+function applyEvening() {
+  const late = isLate();
+  if (document.documentElement.classList.contains('evening') === late) return;
+  document.documentElement.classList.toggle('evening', late);
+  document.querySelector('meta[name="theme-color"]').content = late ? '#EAE2D6' : '#F6F3EE';
+  const typing = document.activeElement?.matches('input, textarea');
+  if (view === 'today' && !typing) renderToday();
+}
+applyEvening();
+setInterval(applyEvening, 60 * 1000);
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
