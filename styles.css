@@ -298,6 +298,9 @@ textarea::placeholder { color: #869094; }
 .entry .source { color: var(--muted); font: italic 400 14px var(--sans); }
 .entry .tools { display: flex; gap: 10px; flex: none; }
 .entry summary { font: 500 18px var(--serif); cursor: pointer; }
+/* A memo's body reads like the rest of the entries: plain sans at body size. */
+.entry.insight details p { font: 400 16px/1.55 var(--sans); margin-top: 4px; }
+.day .entry.insight details p { line-height: var(--rule); margin-top: 0; }
 .day .entry summary, .day .entry .source { line-height: var(--rule); }
 .day .bookend { white-space: pre-line; }
 dialog.wide { width: min(680px, calc(100vw - 24px)); }
