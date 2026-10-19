@@ -69,7 +69,7 @@ function keyDate(key) {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
-const longDate = (key) => keyDate(key).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+const longDate = (key) => keyDate(key).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
 const nowHHMM = () => new Date().toTimeString().slice(0, 5);
 // Late runs from the nudge until early morning, so work past midnight still counts as late.
 const isLate = () => nowHHMM() >= NUDGE_AT || nowHHMM() < '05:00';
