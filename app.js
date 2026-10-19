@@ -626,12 +626,12 @@ $('#import-file').addEventListener('change', async (event) => {
 renderBackup();
 show('today');
 
-// The evening tone follows the clock. Today is redrawn when it turns, unless something is being typed.
+// Night mode follows the clock. Today is redrawn when it turns, unless something is being typed.
 function applyEvening() {
   const late = isLate();
-  if (document.documentElement.classList.contains('evening') === late) return;
-  document.documentElement.classList.toggle('evening', late);
-  document.querySelector('meta[name="theme-color"]').content = late ? '#EAE2D6' : '#F6F3EE';
+  if (document.documentElement.classList.contains('night') === late) return;
+  document.documentElement.classList.toggle('night', late);
+  document.querySelector('meta[name="theme-color"]').content = late ? '#1E2426' : '#F6F3EE';
   const typing = document.activeElement?.matches('input, textarea');
   if (view === 'today' && !typing) renderToday();
 }
