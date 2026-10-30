@@ -338,6 +338,8 @@ function weekendHTML() {
       <button class="link" data-action="export">Save a backup</button><button class="link" data-action="backup-later">Later</button></p>` : ''}
     ${weekHTML()}
     ${revisitHTML(true)}
+    ${mailHTML()}
+    ${keyDate(key).getDay() === 0 ? craftHTML() : ''}
     <div class="card">
       <p class="eyebrow">If something comes to you</p>
       ${entries || '<p class="quiet-note">Nothing is needed here.</p>'}
@@ -355,6 +357,46 @@ function weekendHTML() {
         <a class="link" href="../selma-mail/">Mail journal</a>
       </div>
     </div>`;
+}
+
+// One letter a week. The mail journal shares this browser's storage, so its write-next list
+// and mailings are read from there (never changed): logging a letter in the mail journal is
+// what closes the loop here.
+function mailHTML() {
+  let mail = {};
+  try { mail = JSON.parse(localStorage.getItem('selma-mail.v1')) || {}; } catch {}
+  const monday = mondayOf(dayKey());
+  const sent = (mail.mailings || []).filter((m) => m.sentDate && inWeek(m.sentDate, monday));
+  const list = [...(mail.writeNext || [])].sort((a, b) => (a.addedDate || '').localeCompare(b.addedDate || ''));
+  const names = (items) => items.map((x) => esc(x.toName || x.name)).filter(Boolean);
+  let body;
+  if (sent.length) {
+    const to = [...new Set(names(sent))];
+    body = `<p class="said">This week's ${sent.length > 1 ? 'mail is' : sent[0].type === 'postcard' ? 'postcard is' : 'letter is'} on its way${to.length ? ` to ${to.join(' and ')}` : ''}.</p>`;
+  } else {
+    body = `<p class="said">Who's getting a letter this weekend?</p>
+      ${list.length
+        ? `<p class="quiet-note">On your write-next list: ${names(list.slice(0, 5)).join(', ')}${list.length > 5 ? ', and more' : ''}.</p>`
+        : '<p class="quiet-note">Your write-next list is empty. Who comes to mind?</p>'}`;
+  }
+  return `<div class="card mail">
+    <p class="eyebrow">Snail mail</p>
+    ${body}
+    <p class="aside"><a class="link" href="../selma-mail/">${sent.length ? 'Mail journal' : 'Open the mail journal'}</a></p>
+  </div>`;
+}
+
+// On Sundays, a word on anything made by hand. It sits with the week, not with the work.
+function craftHTML() {
+  const monday = mondayOf(dayKey());
+  return `<div class="card">
+    <p class="eyebrow">Made by hand</p>
+    <form class="stack" id="craft-form">
+      <label>Did you make anything this week? <span class="optional">optional</span>
+        <textarea name="craft" data-week="${monday}" rows="2" maxlength="1000">${esc(state.weeks[monday]?.craft || '')}</textarea>
+      </label>
+    </form>
+  </div>`;
 }
 
 /* ---------- Notebook ---------- */
@@ -380,8 +422,9 @@ function dayHTML(key, filter = {}) {
   const day = state.days[key] || {};
   const entries = entriesHTML(key, filter);
   filter = filter.kind || filter.home; // the bookends only show when nothing is filtered
-  const week = keyDate(key).getDay() === 0 ? state.weeks[mondayOf(key)]?.text : '';
-  const bookends = !filter && (day.intention || day.closing || week);
+  const sunday = keyDate(key).getDay() === 0 ? state.weeks[mondayOf(key)] || {} : {};
+  const week = sunday.text, craft = sunday.craft;
+  const bookends = !filter && (day.intention || day.closing || week || craft);
   if (!entries && !bookends) return '';
   return `<article class="day">
     <h3>${longDate(key)}</h3>
@@ -389,12 +432,13 @@ function dayHTML(key, filter = {}) {
     ${entries}
     ${!filter && day.closing ? `<p class="bookend"><b>Pick up next</b>${esc(day.closing)}</p>` : ''}
     ${!filter && week ? `<p class="bookend"><b>This week, taking shape</b>${esc(week)}</p>` : ''}
+    ${!filter && craft ? `<p class="bookend"><b>Made by hand</b>${esc(craft)}</p>` : ''}
   </article>`;
 }
 
 function allDays() {
   const keys = new Set([...Object.keys(state.days), ...state.sittings.map((s) => s.day), ...state.insights.map((i) => i.day),
-    ...Object.keys(state.weeks).filter((m) => state.weeks[m].text).map((m) => addDays(m, 6))]);
+    ...Object.keys(state.weeks).filter((m) => state.weeks[m].text || state.weeks[m].craft).map((m) => addDays(m, 6))]);
   return [...keys].sort().reverse();
 }
 
@@ -663,6 +707,9 @@ document.addEventListener('input', (event) => {
   const el = event.target;
   if (el.form?.id === 'week-form' && el.name === 'closing') {
     today().closing = el.value;
+    save();
+  } else if (el.form?.id === 'craft-form') {
+    (state.weeks[el.dataset.week] ||= {}).craft = el.value;
     save();
   } else if (el.form?.id === 'week-form') {
     (state.weeks[el.dataset.week] ||= {}).text = el.value;

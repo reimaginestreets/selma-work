@@ -417,3 +417,5 @@ footer .backup .btn { font-size: 14px; padding: 7px 14px; }
 .elsewhere p { margin: 0 0 10px; }
 .elsewhere .actions { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
 .card.come-back ul { gap: 8px; }
+.card.mail .said { margin: 0 0 6px; font: 400 20px/1.45 var(--serif); }
+.card.mail .quiet-note { margin: 0; }
