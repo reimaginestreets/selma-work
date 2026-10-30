@@ -336,6 +336,16 @@ dialog.wide { width: min(680px, calc(100vw - 24px)); }
 .entry .kind { font: 500 12px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
 .card .left-off { margin: 0 0 14px; color: var(--muted); }
 .card .left-off b { font-weight: 500; color: var(--ink); }
+.come-back { margin-bottom: 14px; }
+.come-back .left-off { margin-bottom: 4px; }
+.come-back ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.come-back li { display: flex; gap: 12px; align-items: baseline; }
+.come-back li .link:first-child { text-align: left; font-size: 15px; color: var(--ink); text-decoration-color: var(--line); }
+.come-back .link.quiet { color: var(--muted); font-size: 13px; flex: none; }
+.entry .flagged { color: var(--muted); }
+.week .week-modes { margin: 0 0 12px; }
+.week .week-modes .dot + .dot { margin-left: 12px; }
+.week .entries { margin-bottom: 16px; }
 .quiet-note { color: var(--muted); margin: 0; }
 
 /* Notebook */
@@ -401,3 +411,9 @@ footer .backup .btn { font-size: 14px; padding: 7px 14px; }
   .day { padding-left: 44px; background-position: -14px 0, 0 15px, 0 0; }
   .card .row .btn { flex: 1 1 100%; }
 }
+
+/* The weekend: the way out to the other journals. */
+.elsewhere { text-align: center; color: var(--muted); padding: 8px 20px 0; }
+.elsewhere p { margin: 0 0 10px; }
+.elsewhere .actions { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.card.come-back ul { gap: 8px; }

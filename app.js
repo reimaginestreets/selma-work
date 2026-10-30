@@ -38,7 +38,7 @@ const noteDialog = $('#note-dialog');
 const noteForm = $('#note-form');
 
 function blankState() {
-  return { days: {}, sittings: [], insights: [], noteDrafts: {} };
+  return { days: {}, sittings: [], insights: [], noteDrafts: {}, weeks: {} };
 }
 
 function loadState() {
@@ -74,7 +74,21 @@ const nowHHMM = () => new Date().toTimeString().slice(0, 5);
 // Late runs from the nudge until early morning, so work past midnight still counts as late.
 const isLate = () => nowHHMM() >= NUDGE_AT || nowHHMM() < '05:00';
 const daysBetween = (a, b) => Math.round((keyDate(b) - keyDate(a)) / 864e5);
+const isWeekend = (key = dayKey()) => [0, 6].includes(keyDate(key).getDay());
 const today = () => (state.days[dayKey()] ||= {});
+
+// Weeks run Monday to Sunday and are keyed by their Monday.
+function mondayOf(key) {
+  const d = keyDate(key);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return dayKey(d);
+}
+function addDays(key, n) {
+  const d = keyDate(key);
+  d.setDate(d.getDate() + n);
+  return dayKey(d);
+}
+const inWeek = (day, monday) => day >= monday && day <= addDays(monday, 6);
 
 // When an entry was made. Ids begin with the time, so the earliest entries without `at` still sort.
 const madeAt = (entry) => entry.at || parseInt(entry.id.slice(0, -4), 36) || 0;
@@ -129,11 +143,12 @@ function insightHTML(i) {
   const text = `<p>${esc(i.text)}</p>`;
   return `<li class="entry insight">
     <div class="body">
-      <span class="kind">${memo ? `Memo${i.tag ? ` · ${esc(i.tag)}` : ''}` : 'Insight'}</span>
+      <span class="kind">${memo ? `Memo${i.tag ? ` · ${esc(i.tag)}` : ''}` : 'Insight'}${i.flag ? '<span class="flagged"> · to revisit</span>' : ''}</span>
       ${memo ? `<details><summary>${esc(i.title || 'Untitled')}</summary>${text}</details>` : text}
       ${i.source ? `<span class="source">From: ${esc(i.source)}</span>` : ''}
     </div>
     <span class="tools">
+      <button class="btn danger" data-action="flag-note" data-id="${i.id}">${i.flag ? 'Done' : 'Revisit'}</button>
       <button class="btn danger" data-action="edit-note" data-id="${i.id}">Edit</button>
       <button class="btn danger" data-action="remove-insight" data-id="${i.id}">Remove</button>
     </span>
@@ -141,12 +156,12 @@ function insightHTML(i) {
 }
 
 function entriesHTML(key, { kind = '', home = '', tag = '' } = {}) {
-  const notesOnly = kind === 'insights' || kind === 'memos';
+  const notesOnly = kind === 'insights' || kind === 'memos' || kind === 'flagged';
   const sittings = notesOnly ? [] : state.sittings.filter((s) => s.day === key
     && (!kind || s.modes.includes(kind)) && (!home || s.thread === home));
   // Insights and memos have no home, so a home filter shows sittings only.
   const insights = (kind && !notesOnly) || home ? [] : state.insights.filter((i) => i.day === key
-    && (!kind || (i.kind === 'memo') === (kind === 'memos')) && (!tag || i.tag === tag));
+    && (kind === 'flagged' ? i.flag : !kind || (i.kind === 'memo') === (kind === 'memos')) && (!tag || i.tag === tag));
   if (!sittings.length && !insights.length) return '';
   // Sittings and insights sit together in the order they happened.
   const all = [...sittings.map((s) => [s, sittingHTML]), ...insights.map((i) => [i, insightHTML])];
@@ -160,6 +175,13 @@ function renderGreeting() {
   const h = new Date().getHours();
   const closed = today().closed;
   const resting = isRest(dayKey());
+  if (isWeekend()) {
+    const sunday = new Date().getDay() === 0;
+    $('#greeting').textContent = sunday ? 'Happy Sunday.' : 'Happy Saturday.';
+    $('#today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    $('#greeting-sub').textContent = sunday ? 'A look back, a word for Monday, and then the day is yours.' : 'Let the week settle. Nothing is asked of today.';
+    return;
+  }
   $('#greeting').textContent = resting ? 'Rest well.' : closed ? 'Well done.' : h < 12 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.';
   $('#today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   $('#greeting-sub').textContent = resting ? 'Nothing is asked of today.' : closed ? 'The rest of the day is yours.' : 'One small touch is enough.';
@@ -170,19 +192,23 @@ function renderToday() {
   const day = today();
   const key = dayKey();
 
+  if (isWeekend()) {
+    $('#today').innerHTML = weekendHTML();
+    return;
+  }
+
   if (day.closed) {
     $('#today').innerHTML = `<div class="closed">
       <img src="selma-work.svg" alt="" width="96" height="96">
       <h3>The book is closed.</h3>
       ${day.closing ? `<p class="said"><b>Next</b> <em>${esc(day.closing)}</em></p>` : ''}
-      ${day.evening ? `<p class="said"><b>This evening</b> <em>${esc(day.evening)}</em></p>` : ''}
       <p>Work will keep until tomorrow. Selma has other journals for the evening.</p>
       <div class="actions">
         <a class="link" href="../selma-time/">Slow time journal</a>
         <a class="link" href="../selma-mail/">Mail journal</a>
         <button class="link" data-action="reopen">Reopen the book</button>
       </div>
-    </div>`;
+    </div>${weekHTML()}`;
     return;
   }
 
@@ -196,7 +222,7 @@ function renderToday() {
         <a class="link" href="../selma-mail/">Mail journal</a>
         <button class="link" data-action="toggle-rest" data-day="${key}">Work today after all</button>
       </div>
-    </div>`;
+    </div>${weekHTML()}`;
     return;
   }
 
@@ -212,21 +238,20 @@ function renderToday() {
     <div class="card">
       <p class="eyebrow">Opening</p>
       ${pickUp ? `<p class="left-off"><b>Where you left off:</b> ${esc(pickUp)}</p>` : ''}
+      ${revisitHTML()}
       ${day.intention && !editingIntention
         ? `<p class="said">${esc(day.intention)}</p>
-           ${day.evening ? `<p class="evening"><b>This evening:</b> ${esc(day.evening)}</p>` : ''}
            <p class="aside"><button class="link" data-action="edit-intention">Change</button></p>`
         : `<form class="stack" id="intention-form">
              <label>What is today's work for?
                <input type="text" name="intention" autocomplete="off" maxlength="200" value="${esc(day.intention || day.draft || '')}">
              </label>
-             <label>What restful thing are you looking forward to this evening? <span class="optional">optional</span>
-               <input type="text" name="evening" autocomplete="off" maxlength="200" value="${esc(day.evening || '')}">
-             </label>
              <button class="btn primary">Open the book</button>
            </form>
            ${day.intention ? '' : `<p class="aside"><button class="link" data-action="toggle-rest" data-day="${key}">Make today a day of rest</button></p>`}`}
     </div>
+
+    ${weekHTML()}
 
     ${!day.intention ? '' : `
     <div class="card">
@@ -244,10 +269,92 @@ function renderToday() {
         <label>Where can you pick up next?
           <textarea name="closing" rows="2" maxlength="600">${esc(day.closing || '')}</textarea>
         </label>
-        ${day.evening ? `<p class="evening"><b>Waiting for you this evening:</b> ${esc(day.evening)}</p>` : ''}
         <button class="btn primary">Close the book</button>
       </form>
     </div>`}`;
+}
+
+// Insights and memos flagged to revisit wait at the top of the Opening card until marked done.
+// At the weekend they have a card of their own.
+function revisitHTML(card = false) {
+  const flagged = state.insights.filter((i) => i.flag).sort((a, b) => madeAt(a) - madeAt(b));
+  if (!flagged.length) return '';
+  const label = (i) => (i.kind === 'memo' && i.title ? i.title : i.text.length > 90 ? i.text.slice(0, 88).trimEnd() + '…' : i.text);
+  return `<div class="${card ? 'card ' : ''}come-back">
+    ${card ? '<p class="eyebrow">To revisit</p>' : '<p class="left-off"><b>To revisit</b></p>'}
+    <ul>${flagged.map((i) => `<li>
+      <button class="link" data-action="edit-note" data-id="${i.id}">${esc(label(i))}</button>
+      <button class="link quiet" data-action="flag-note" data-id="${i.id}">Done</button>
+    </li>`).join('')}</ul>
+  </div>`;
+}
+
+// At the weekend, a look back over the week: the kinds of work, its insights and memos, and one question.
+// On Monday, last week's look-back stays open if it was missed and there was something in it.
+function lookBackWeek() {
+  const key = dayKey();
+  const weekday = keyDate(key).getDay();
+  if (isWeekend(key)) return mondayOf(key);
+  if (weekday === 1) {
+    const last = addDays(key, -7);
+    const had = [...state.sittings, ...state.insights].some((e) => inWeek(e.day, last));
+    if (had && !state.weeks[last]?.text) return last;
+  }
+  return '';
+}
+
+function weekHTML() {
+  const monday = lookBackWeek();
+  if (!monday) return '';
+  const sittings = state.sittings.filter((s) => inWeek(s.day, monday));
+  const notes = state.insights.filter((i) => inWeek(i.day, monday)).sort((a, b) => a.day.localeCompare(b.day) || madeAt(a) - madeAt(b));
+  const modes = MODES.filter((m) => sittings.some((s) => s.modes.includes(m.id))).map((m) => m.id);
+  // Sunday's word for Monday is kept as the day's "pick up next", so Monday opens with it.
+  const sunday = keyDate(dayKey()).getDay() === 0;
+  return `<div class="card week">
+    <p class="eyebrow">${monday === mondayOf(dayKey()) ? 'This week' : 'Last week'}</p>
+    ${modes.length ? `<p class="week-modes">${modeDots(modes)}</p>` : ''}
+    ${notes.length ? `<ul class="entries">${notes.map(insightHTML).join('')}</ul>` : '<p class="quiet-note">No insights or memos this week. That is alright too.</p>'}
+    <form class="stack" id="week-form">
+      <label>What's taking shape?
+        <textarea name="week" data-week="${monday}" rows="3" maxlength="2000">${esc(state.weeks[monday]?.text || '')}</textarea>
+      </label>
+      ${sunday ? `<label>Where will Monday begin?
+        <textarea name="closing" rows="2" maxlength="600">${esc(today().closing || '')}</textarea>
+      </label>` : ''}
+    </form>
+  </div>`;
+}
+
+// Saturdays and Sundays are not for working the way weekdays are. There is no book to open:
+// the week comes first, then whatever is waiting to be revisited, and a quiet place at the
+// end for anything that comes along anyway.
+function weekendHTML() {
+  const key = dayKey();
+  const entries = entriesHTML(key);
+  const worked = state.sittings.some((s) => s.day === key);
+  return `
+    ${backupDue() ? `<p class="nudge quiet">${localStorage.getItem(BACKUP_KEY) ? 'It has been a while since the last backup.' : 'This journal has not been backed up yet.'}
+      <button class="link" data-action="export">Save a backup</button><button class="link" data-action="backup-later">Later</button></p>` : ''}
+    ${weekHTML()}
+    ${revisitHTML(true)}
+    <div class="card">
+      <p class="eyebrow">If something comes to you</p>
+      ${entries || '<p class="quiet-note">Nothing is needed here.</p>'}
+      <div class="actions">
+        <button class="btn" data-action="note-sitting">Note a sitting</button>
+        <button class="btn" data-action="write-memo">Write a memo</button>
+      </div>
+      ${worked ? '' : `<p class="aside">${isRest(key) ? 'Set aside for rest. ' : ''}<button class="link" data-action="toggle-rest" data-day="${key}">${state.days[key]?.rest ? 'Not a rest day after all' : 'Make today a day of rest'}</button></p>`}
+    </div>
+    <div class="elsewhere">
+      <p>Selma has other journals for the weekend.</p>
+      <div class="actions">
+        <a class="link" href="../selma-time/">Slow time journal</a>
+        <a class="link" href="../selma-read/">Reading journal</a>
+        <a class="link" href="../selma-mail/">Mail journal</a>
+      </div>
+    </div>`;
 }
 
 /* ---------- Notebook ---------- */
@@ -261,11 +368,11 @@ function chips(name, legend, options, current) {
 
 function renderFilter() {
   const { kind, home, tag } = notebookFilter;
-  const kinds = [['', 'Everything'], ['insights', 'Insights'], ['memos', 'Memos'], ...MODES.map((m) => [m.id, m.name])];
+  const kinds = [['', 'Everything'], ['insights', 'Insights'], ['memos', 'Memos'], ['flagged', 'To revisit'], ...MODES.map((m) => [m.id, m.name])];
   const homes = [['', 'Anywhere'], ['dissertation', 'Dissertation'], ['none', 'No home yet'], ['tud', 'TUD'], ['other', 'Something else']];
   const tags = [['', 'Any kind'], ...MEMO_TAGS.map((t) => [t, t])];
   $('#notebook-filter').innerHTML = chips('filter', 'Leaf through', kinds, kind)
-    + (kind === 'insights' || kind === 'memos' ? '' : chips('home', 'Belonging to', homes, home))
+    + (kind === 'insights' || kind === 'memos' || kind === 'flagged' ? '' : chips('home', 'Belonging to', homes, home))
     + (kind === 'memos' ? chips('tag', 'Kind of memo', tags, tag) : '');
 }
 
@@ -273,18 +380,21 @@ function dayHTML(key, filter = {}) {
   const day = state.days[key] || {};
   const entries = entriesHTML(key, filter);
   filter = filter.kind || filter.home; // the bookends only show when nothing is filtered
-  const bookends = !filter && (day.intention || day.closing);
+  const week = keyDate(key).getDay() === 0 ? state.weeks[mondayOf(key)]?.text : '';
+  const bookends = !filter && (day.intention || day.closing || week);
   if (!entries && !bookends) return '';
   return `<article class="day">
     <h3>${longDate(key)}</h3>
     ${!filter && day.intention ? `<p class="bookend"><b>For</b>${esc(day.intention)}</p>` : ''}
     ${entries}
     ${!filter && day.closing ? `<p class="bookend"><b>Pick up next</b>${esc(day.closing)}</p>` : ''}
+    ${!filter && week ? `<p class="bookend"><b>This week, taking shape</b>${esc(week)}</p>` : ''}
   </article>`;
 }
 
 function allDays() {
-  const keys = new Set([...Object.keys(state.days), ...state.sittings.map((s) => s.day), ...state.insights.map((i) => i.day)]);
+  const keys = new Set([...Object.keys(state.days), ...state.sittings.map((s) => s.day), ...state.insights.map((i) => i.day),
+    ...Object.keys(state.weeks).filter((m) => state.weeks[m].text).map((m) => addDays(m, 6))]);
   return [...keys].sort().reverse();
 }
 
@@ -461,7 +571,13 @@ document.addEventListener('click', (event) => {
     renderToday();
   }
   else if (action === 'edit-sitting') openSittingDialog(state.sittings.find((x) => x.id === id));
-  else if (action === 'edit-note') {
+  else if (action === 'flag-note') {
+    const note = state.insights.find((x) => x.id === id);
+    if (note) note.flag = !note.flag;
+    save();
+    RENDER[view]();
+    if (note?.flag) toast(isWeekend() ? 'It will wait for you here.' : 'It will wait for you in the Opening card.');
+  } else if (action === 'edit-note') {
     const note = state.insights.find((x) => x.id === id);
     if (note) openNoteDialog(note.kind === 'memo' ? 'memo' : 'insight', note);
   }
@@ -497,7 +613,6 @@ document.addEventListener('submit', (event) => {
     const day = today();
     if (!text('intention')) return;
     day.intention = text('intention');
-    day.evening = text('evening');
     delete day.draft;
     editingIntention = false;
     save();
@@ -546,7 +661,13 @@ document.addEventListener('submit', (event) => {
 // Half-written words are saved as they are typed, so a stray key or a closed tab loses nothing.
 document.addEventListener('input', (event) => {
   const el = event.target;
-  if (el.form?.id === 'closing-form') {
+  if (el.form?.id === 'week-form' && el.name === 'closing') {
+    today().closing = el.value;
+    save();
+  } else if (el.form?.id === 'week-form') {
+    (state.weeks[el.dataset.week] ||= {}).text = el.value;
+    save();
+  } else if (el.form?.id === 'closing-form') {
     today()[el.name] = el.value;
     save();
   } else if (el.form === noteForm && !noteForm.elements.id.value) {
