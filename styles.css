@@ -419,3 +419,12 @@ footer .backup .btn { font-size: 14px; padding: 7px 14px; }
 .card.come-back ul { gap: 8px; }
 .card.mail .said { margin: 0 0 6px; font: 400 20px/1.45 var(--serif); }
 .card.mail .quiet-note { margin: 0; }
+
+/* Captured thoughts: typed, then set down as finished text. */
+.capture { margin-top: 18px; }
+.capture-label { margin: 0 0 8px; font-weight: 500; color: var(--ink); }
+.captured { display: flex; gap: 12px; align-items: baseline; margin: 0 0 10px; }
+.captured p { flex: 1; margin: 0; font: 400 18px/1.5 var(--serif); white-space: pre-line; }
+.captured .link.quiet { color: var(--muted); font-size: 13px; flex: none; }
+.capture-actions { display: flex; gap: 14px; align-items: center; }
+.capture-form { margin-bottom: 10px; }

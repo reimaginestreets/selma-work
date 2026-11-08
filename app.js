@@ -30,6 +30,7 @@ const state = loadState();
 const notebookFilter = { kind: '', home: '', tag: '' };
 let trailDay = null;     // the day opened on the trail
 let editingIntention = false;
+let editingCapture = null; // 'field:id' of a captured thought being edited
 
 const $ = (sel) => document.querySelector(sel);
 const sittingDialog = $('#sitting-dialog');
@@ -42,11 +43,20 @@ function blankState() {
 }
 
 function loadState() {
+  let data;
   try {
-    return { ...blankState(), ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') };
+    data = { ...blankState(), ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') };
   } catch {
     return blankState();
   }
+  // A week's thoughts used to be one open box each; they are now captured one at a time.
+  for (const w of Object.values(data.weeks)) {
+    for (const [old, list] of [['text', 'shapes'], ['craft', 'crafts']]) {
+      if (w[old]?.trim()) (w[list] ||= []).unshift({ id: Date.now().toString(36) + old, at: Date.now(), text: w[old].trim() });
+      delete w[old];
+    }
+  }
+  return data;
 }
 
 function save() {
@@ -298,7 +308,7 @@ function lookBackWeek() {
   if (weekday === 1) {
     const last = addDays(key, -7);
     const had = [...state.sittings, ...state.insights].some((e) => inWeek(e.day, last));
-    if (had && !state.weeks[last]?.text) return last;
+    if (had && !state.weeks[last]?.shapes?.length) return last;
   }
   return '';
 }
@@ -315,14 +325,40 @@ function weekHTML() {
     <p class="eyebrow">${monday === mondayOf(dayKey()) ? 'This week' : 'Last week'}</p>
     ${modes.length ? `<p class="week-modes">${modeDots(modes)}</p>` : ''}
     ${notes.length ? `<ul class="entries">${notes.map(insightHTML).join('')}</ul>` : '<p class="quiet-note">No insights or memos this week. That is alright too.</p>'}
-    <form class="stack" id="week-form">
-      <label>What's taking shape?
-        <textarea name="week" data-week="${monday}" rows="3" maxlength="2000">${esc(state.weeks[monday]?.text || '')}</textarea>
-      </label>
-      ${sunday ? `<label>Where will Monday begin?
-        <textarea name="closing" rows="2" maxlength="600">${esc(today().closing || '')}</textarea>
-      </label>` : ''}
-    </form>
+    ${captureHTML('shape', monday, "What's taking shape?", 3)}
+    ${sunday ? captureHTML('monday', monday, 'Where will Monday begin?', 2) : ''}
+  </div>`;
+}
+
+/* A thought is typed, then captured: it settles into the page as finished text, which can be
+   edited later or added to with another. "monday" is a single thought, kept as Sunday's
+   "pick up next"; "shape" and "craft" belong to the week and can hold several. */
+const CAPTURE_LISTS = { shape: 'shapes', craft: 'crafts' };
+
+function captures(field, week) {
+  if (field === 'monday') return today().closing ? [{ id: 'monday', text: today().closing }] : [];
+  return state.weeks[week]?.[CAPTURE_LISTS[field]] || [];
+}
+
+function captureDraft(field, week) {
+  return field === 'monday' ? today().mondayDraft || '' : state.weeks[week]?.drafts?.[field] || '';
+}
+
+function captureHTML(field, week, label, rows) {
+  const items = captures(field, week);
+  const single = field === 'monday';
+  const form = (item) => `<form class="stack capture-form" data-field="${field}" data-week="${week}" data-edit="${item ? item.id : ''}">
+      <textarea name="text" rows="${rows}" maxlength="2000" aria-label="${esc(label)}"${!item && items.length ? ' placeholder="Add another thought"' : ''}>${esc(item ? item.text : captureDraft(field, week))}</textarea>
+      <div class="capture-actions">
+        <button class="btn">${item ? 'Save' : single ? 'Keep it' : 'Capture'}</button>
+        ${item ? '<button type="button" class="link quiet" data-action="cancel-capture">Cancel</button>' : ''}
+      </div>
+    </form>`;
+  return `<div class="capture">
+    <p class="capture-label">${label}</p>
+    ${items.map((i) => editingCapture === `${field}:${i.id}` ? form(i)
+      : `<div class="captured"><p>${esc(i.text)}</p><button class="link quiet" data-action="edit-capture" data-key="${field}:${i.id}">Edit</button></div>`).join('')}
+    ${single && items.length ? '' : form(null)}
   </div>`;
 }
 
@@ -352,9 +388,9 @@ function weekendHTML() {
     <div class="elsewhere">
       <p>Selma has other journals for the weekend.</p>
       <div class="actions">
-        <a class="link" href="../selma-time/">Slow time journal</a>
-        <a class="link" href="../selma-read/">Reading journal</a>
-        <a class="link" href="../selma-mail/">Mail journal</a>
+        <a class="link" href="../selma-time/">Slow Time</a>
+        <a class="link" href="../selma-roam/">Slow Roam</a>
+        <a class="link" href="../selma-read/">Slow Read</a>
       </div>
     </div>`;
 }
@@ -369,16 +405,14 @@ function mailHTML() {
   const sent = (mail.mailings || []).filter((m) => m.sentDate && inWeek(m.sentDate, monday));
   const list = [...(mail.writeNext || [])].sort((a, b) => (a.addedDate || '').localeCompare(b.addedDate || ''));
   const names = (items) => items.map((x) => esc(x.toName || x.name)).filter(Boolean);
-  let body;
-  if (sent.length) {
-    const to = [...new Set(names(sent))];
-    body = `<p class="said">This week's ${sent.length > 1 ? 'mail is' : sent[0].type === 'postcard' ? 'postcard is' : 'letter is'} on its way${to.length ? ` to ${to.join(' and ')}` : ''}.</p>`;
-  } else {
-    body = `<p class="said">Who's getting a letter this weekend?</p>
-      ${list.length
-        ? `<p class="quiet-note">On your write-next list: ${names(list.slice(0, 5)).join(', ')}${list.length > 5 ? ', and more' : ''}.</p>`
-        : '<p class="quiet-note">Your write-next list is empty. Who comes to mind?</p>'}`;
-  }
+  const to = [...new Set(names(sent))];
+  // The write-next list shows either way: after this week's letter, it is who comes next.
+  const body = `${sent.length
+      ? `<p class="said">This week's ${sent.length > 1 ? 'mail is' : sent[0].type === 'postcard' ? 'postcard is' : 'letter is'} on its way${to.length ? ` to ${to.join(' and ')}` : ''}.</p>`
+      : `<p class="said">Who's getting a letter this weekend?</p>`}
+    ${list.length
+      ? `<p class="quiet-note">${sent.length ? 'Next' : 'On your write-next list'}: ${names(list.slice(0, 5)).join(', ')}${list.length > 5 ? ', and more' : ''}.</p>`
+      : sent.length ? '' : '<p class="quiet-note">Your write-next list is empty. Who comes to mind?</p>'}`;
   return `<div class="card mail">
     <p class="eyebrow">Snail mail</p>
     ${body}
@@ -391,11 +425,7 @@ function craftHTML() {
   const monday = mondayOf(dayKey());
   return `<div class="card">
     <p class="eyebrow">Made by hand</p>
-    <form class="stack" id="craft-form">
-      <label>Did you make anything this week? <span class="optional">optional</span>
-        <textarea name="craft" data-week="${monday}" rows="2" maxlength="1000">${esc(state.weeks[monday]?.craft || '')}</textarea>
-      </label>
-    </form>
+    ${captureHTML('craft', monday, 'Did you make anything this week?', 2)}
   </div>`;
 }
 
@@ -423,7 +453,8 @@ function dayHTML(key, filter = {}) {
   const entries = entriesHTML(key, filter);
   filter = filter.kind || filter.home; // the bookends only show when nothing is filtered
   const sunday = keyDate(key).getDay() === 0 ? state.weeks[mondayOf(key)] || {} : {};
-  const week = sunday.text, craft = sunday.craft;
+  const joined = (list) => (list || []).map((x) => x.text).join('\n\n');
+  const week = joined(sunday.shapes), craft = joined(sunday.crafts);
   const bookends = !filter && (day.intention || day.closing || week || craft);
   if (!entries && !bookends) return '';
   return `<article class="day">
@@ -438,7 +469,7 @@ function dayHTML(key, filter = {}) {
 
 function allDays() {
   const keys = new Set([...Object.keys(state.days), ...state.sittings.map((s) => s.day), ...state.insights.map((i) => i.day),
-    ...Object.keys(state.weeks).filter((m) => state.weeks[m].text || state.weeks[m].craft).map((m) => addDays(m, 6))]);
+    ...Object.keys(state.weeks).filter((m) => state.weeks[m].shapes?.length || state.weeks[m].crafts?.length).map((m) => addDays(m, 6))]);
   return [...keys].sort().reverse();
 }
 
@@ -626,6 +657,11 @@ document.addEventListener('click', (event) => {
     if (note) openNoteDialog(note.kind === 'memo' ? 'memo' : 'insight', note);
   }
   else if (action === 'close-dialog') el.closest('dialog').close();
+  else if (action === 'edit-capture' || action === 'cancel-capture') {
+    editingCapture = action === 'edit-capture' ? el.dataset.key : null;
+    renderToday();
+    if (editingCapture) document.querySelector('.capture-form[data-edit]:not([data-edit=""]) textarea')?.focus();
+  }
   else if (action === 'edit-intention') {
     editingIntention = true;
     renderToday();
@@ -659,6 +695,26 @@ document.addEventListener('submit', (event) => {
     day.intention = text('intention');
     delete day.draft;
     editingIntention = false;
+    save();
+    renderToday();
+  } else if (form.classList.contains('capture-form')) {
+    const { field, week, edit } = form.dataset;
+    const value = text('text');
+    if (!value && !edit) return;
+    if (field === 'monday') {
+      if (value) today().closing = value;
+      else delete today().closing;
+      delete today().mondayDraft;
+    } else {
+      const w = (state.weeks[week] ||= {});
+      const list = (w[CAPTURE_LISTS[field]] ||= []);
+      const item = edit && list.find((x) => x.id === edit);
+      if (item && value) item.text = value;
+      else if (item) list.splice(list.indexOf(item), 1); // saved empty: let it go
+      else list.push({ id: newId(), at: Date.now(), text: value });
+      if (!edit && w.drafts) delete w.drafts[field];
+    }
+    editingCapture = null;
     save();
     renderToday();
   } else if (form.id === 'closing-form') {
@@ -705,14 +761,10 @@ document.addEventListener('submit', (event) => {
 // Half-written words are saved as they are typed, so a stray key or a closed tab loses nothing.
 document.addEventListener('input', (event) => {
   const el = event.target;
-  if (el.form?.id === 'week-form' && el.name === 'closing') {
-    today().closing = el.value;
-    save();
-  } else if (el.form?.id === 'craft-form') {
-    (state.weeks[el.dataset.week] ||= {}).craft = el.value;
-    save();
-  } else if (el.form?.id === 'week-form') {
-    (state.weeks[el.dataset.week] ||= {}).text = el.value;
+  if (el.form?.classList.contains('capture-form') && !el.form.dataset.edit) {
+    const { field, week } = el.form.dataset;
+    if (field === 'monday') today().mondayDraft = el.value;
+    else ((state.weeks[week] ||= {}).drafts ||= {})[field] = el.value;
     save();
   } else if (el.form?.id === 'closing-form') {
     today()[el.name] = el.value;
