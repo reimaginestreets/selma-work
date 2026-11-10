@@ -248,6 +248,7 @@ footer { padding-bottom: 84px; }
   --analysis: #A892B0;
   --clauding: #DDA0A0;
   --freewriting: #7FAFA8;
+  --conversations: #5E7397;
 }
 .dot::before {
   content: "";

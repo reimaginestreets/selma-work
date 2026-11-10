@@ -21,6 +21,7 @@ const MODES = [
   { id: 'literature', name: 'Desk research' }, // finding and gathering sources, as distinct from reading them
   { id: 'fieldwork', name: 'Fieldwork' },
   { id: 'analysis', name: 'Analysis' },
+  { id: 'conversations', name: 'Conversations' }, // podcasts, talks, meetings, networking calls, and preparing for them
   { id: 'clauding', name: 'Clauding' }, // brainstorming and building with Claude
 ];
 
